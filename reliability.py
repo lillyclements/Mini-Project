@@ -369,6 +369,240 @@ def plot_redundancy_trade_study(failure_probs, improvements, baseline_reliabilit
     print(f"\n✓ Trade study plot saved to {save_path}")
     plt.show()
 
+def monte_carlo_variance_analysis(failure_probs, n_samples, n_runs=50):
+    """
+    Analyze variance in Monte Carlo estimates across multiple runs.
+    
+    This demonstrates the statistical uncertainty inherent in MC methods.
+    With n_samples per run, the standard deviation of estimates should
+    be approximately σ ≈ sqrt(p(1-p)/n) where p is the true reliability.
+    
+    Args:
+        failure_probs: list of failure probabilities
+        n_samples: number of samples per MC run
+        n_runs: number of independent MC runs to perform
+    
+    Returns:
+        tuple: (results, analytical, theoretical_std)
+    """
+    print("\n" + "=" * 70)
+    print("MONTE CARLO VARIANCE ANALYSIS")
+    print("=" * 70)
+    print()
+    
+    analytical = analytical_reliability(failure_probs)
+    print(f"System configuration: {len(failure_probs)} subsystems")
+    print(f"Analytical reliability: {analytical:.6f}")
+    print(f"Running {n_runs} independent MC simulations with {n_samples:,} samples each...")
+    print()
+    
+    results = []
+    for i in range(n_runs):
+        estimate = monte_carlo_reliability(failure_probs, n_samples)
+        results.append(estimate)
+        if (i + 1) % 10 == 0:
+            print(f"  Completed {i+1}/{n_runs} runs...")
+    
+    results = np.array(results)
+    
+    # Calculate statistics
+    mean_estimate = np.mean(results)
+    std_estimate = np.std(results)
+    min_estimate = np.min(results)
+    max_estimate = np.max(results)
+    
+    # Theoretical standard deviation for binomial proportion
+    # σ ≈ sqrt(p(1-p)/n)
+    theoretical_std = np.sqrt(analytical * (1 - analytical) / n_samples)
+    
+    print()
+    print("Results:")
+    print(f"  Mean estimate:        {mean_estimate:.6f}")
+    print(f"  Standard deviation:   {std_estimate:.6f}")
+    print(f"  Theoretical std:      {theoretical_std:.6f}")
+    print(f"  Min estimate:         {min_estimate:.6f}")
+    print(f"  Max estimate:         {max_estimate:.6f}")
+    print(f"  Range:                {max_estimate - min_estimate:.6f}")
+    print()
+    print(f"  Mean error from true: {abs(mean_estimate - analytical):.6f}")
+    print(f"  95% confidence:       ±{1.96 * theoretical_std:.6f}")
+    print()
+    
+    # Check if observed std matches theory
+    ratio = std_estimate / theoretical_std
+    if 0.8 <= ratio <= 1.2:
+        print(f"✓ Observed std matches theory (ratio = {ratio:.2f})")
+    else:
+        print(f"⚠ Observed std differs from theory (ratio = {ratio:.2f})")
+    
+    print("=" * 70)
+    
+    return results, analytical, theoretical_std
+
+
+def plot_variance_analysis(results, analytical, theoretical_std, n_samples,
+                           save_path='variance_analysis.png'):
+    """
+    Visualize Monte Carlo variance across multiple runs.
+    
+    Creates two plots:
+    1. Histogram of MC estimates showing distribution
+    2. Time series of estimates showing run-to-run variability
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    
+    # ===== LEFT PLOT: Histogram =====
+    ax1.hist(results, bins=20, density=True, alpha=0.7, color='skyblue', 
+             edgecolor='black', label='MC Estimates')
+    
+    # Add analytical solution line
+    ax1.axvline(analytical, color='red', linestyle='--', linewidth=2,
+                label=f'Analytical = {analytical:.6f}')
+    
+    # Add theoretical normal distribution
+    mean_result = np.mean(results)
+    x_range = np.linspace(results.min(), results.max(), 100)
+    theoretical_pdf = (1 / (theoretical_std * np.sqrt(2 * np.pi))) * \
+                      np.exp(-0.5 * ((x_range - analytical) / theoretical_std) ** 2)
+    ax1.plot(x_range, theoretical_pdf, 'g-', linewidth=2, 
+             label=f'Theoretical N({analytical:.4f}, {theoretical_std:.4f}²)')
+    
+    ax1.set_xlabel('Reliability Estimate', fontsize=12)
+    ax1.set_ylabel('Density', fontsize=12)
+    ax1.set_title(f'Distribution of MC Estimates (n={n_samples:,})', 
+                  fontsize=14, fontweight='bold')
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.3, axis='y')
+    
+    # ===== RIGHT PLOT: Time Series =====
+    ax2.scatter(range(len(results)), results, alpha=0.6, s=50, color='steelblue')
+    ax2.axhline(analytical, color='red', linestyle='--', linewidth=2,
+                label='Analytical Solution')
+    
+    # Add confidence interval bands
+    ax2.axhspan(analytical - 1.96*theoretical_std, 
+                analytical + 1.96*theoretical_std,
+                alpha=0.2, color='green', label='95% Confidence Interval')
+    
+    ax2.set_xlabel('Run Number', fontsize=12)
+    ax2.set_ylabel('Reliability Estimate', fontsize=12)
+    ax2.set_title('MC Estimate Variability Across Runs', 
+                  fontsize=14, fontweight='bold')
+    ax2.legend(fontsize=9)
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    print(f"\n✓ Variance analysis plot saved to {save_path}")
+    plt.show()
+
+
+def edge_case_tests():
+    """
+    Test edge cases to verify implementation correctness.
+    
+    Tests:
+    1. All subsystems perfect (p=0) → R should be 1.0
+    2. All subsystems fail (p=1) → R should be 0.0
+    3. Single subsystem → R = 1 - p
+    4. Very high reliability system → numerically stable
+    """
+    print("\n" + "=" * 70)
+    print("EDGE CASE VERIFICATION TESTS")
+    print("=" * 70)
+    print()
+    
+    n_samples = 100000
+    all_passed = True
+    
+    # Test 1: Perfect system (all p=0)
+    print("Test 1: Perfect system (all failure probabilities = 0)")
+    perfect_probs = [0.0, 0.0, 0.0]
+    mc_result = monte_carlo_reliability(perfect_probs, n_samples)
+    analytical_result = analytical_reliability(perfect_probs)
+    print(f"  MC estimate:  {mc_result:.6f}")
+    print(f"  Analytical:   {analytical_result:.6f}")
+    if mc_result == 1.0 and analytical_result == 1.0:
+        print("  ✓ PASSED: Perfect system has R = 1.0")
+    else:
+        print("  ✗ FAILED")
+        all_passed = False
+    print()
+    
+    # Test 2: Failed system (all p=1)
+    print("Test 2: Failed system (all failure probabilities = 1)")
+    failed_probs = [1.0, 1.0, 1.0]
+    mc_result = monte_carlo_reliability(failed_probs, n_samples)
+    analytical_result = analytical_reliability(failed_probs)
+    print(f"  MC estimate:  {mc_result:.6f}")
+    print(f"  Analytical:   {analytical_result:.6f}")
+    if mc_result == 0.0 and analytical_result == 0.0:
+        print("  ✓ PASSED: Failed system has R = 0.0")
+    else:
+        print("  ✗ FAILED")
+        all_passed = False
+    print()
+    
+    # Test 3: Single subsystem
+    print("Test 3: Single subsystem with p = 0.1")
+    single_prob = [0.1]
+    mc_result = monte_carlo_reliability(single_prob, n_samples)
+    analytical_result = analytical_reliability(single_prob)
+    error = abs(mc_result - analytical_result)
+    print(f"  MC estimate:  {mc_result:.6f}")
+    print(f"  Analytical:   {analytical_result:.6f} (= 1 - 0.1 = 0.9)")
+    print(f"  Error:        {error:.6f}")
+    if error < 0.005:  # Allow small statistical error
+        print("  ✓ PASSED: Single subsystem test within tolerance")
+    else:
+        print("  ✗ FAILED: Error too large")
+        all_passed = False
+    print()
+    
+    # Test 4: High reliability system
+    print("Test 4: High reliability system (very small failure rates)")
+    high_rel_probs = [0.0001, 0.0002, 0.0001]
+    mc_result = monte_carlo_reliability(high_rel_probs, n_samples)
+    analytical_result = analytical_reliability(high_rel_probs)
+    error = abs(mc_result - analytical_result)
+    print(f"  MC estimate:  {mc_result:.6f}")
+    print(f"  Analytical:   {analytical_result:.6f}")
+    print(f"  Error:        {error:.6f}")
+    if error < 0.001:
+        print("  ✓ PASSED: High reliability test within tolerance")
+    else:
+        print("  ✗ FAILED: Error too large")
+        all_passed = False
+    print()
+    
+    # Test 5: Redundancy edge case
+    print("Test 5: Redundancy - single component with backup")
+    single_with_backup = [0.2]
+    redundancy = [2]
+    mc_result = monte_carlo_reliability_with_redundancy(single_with_backup, redundancy, n_samples)
+    analytical_result = analytical_reliability_with_redundancy(single_with_backup, redundancy)
+    expected = 1 - (0.2 ** 2)  # 1 - p^2
+    print(f"  MC estimate:  {mc_result:.6f}")
+    print(f"  Analytical:   {analytical_result:.6f}")
+    print(f"  Expected:     {expected:.6f} (= 1 - 0.2²)")
+    error = abs(mc_result - analytical_result)
+    if error < 0.005:
+        print("  ✓ PASSED: Redundancy calculation correct")
+    else:
+        print("  ✗ FAILED: Error too large")
+        all_passed = False
+    print()
+    
+    # Summary
+    print("-" * 70)
+    if all_passed:
+        print("✓✓✓ ALL EDGE CASE TESTS PASSED ✓✓✓")
+    else:
+        print("⚠ SOME TESTS FAILED - Review implementation")
+    print("=" * 70)
+    
+    return all_passed
+
 # ============================================================================
 # CONVERGENCE STUDY TEST
 # ============================================================================
@@ -527,10 +761,19 @@ Examples:
         improvements, baseline = redundancy_trade_study(args.failures, n_samples=args.samples)
         plot_redundancy_trade_study(args.failures, improvements, baseline)
     
-    print("\n" + "=" * 70)
-    print("ANALYSIS COMPLETE")
-    print("=" * 70)
-    print()
+        if args.run in ['all']:
+            # Variance analysis
+            results, analytical, theoretical_std = monte_carlo_variance_analysis(
+                args.failures, n_samples=10000, n_runs=50)
+            plot_variance_analysis(results, analytical, theoretical_std, 10000)
+    
+            # Edge case tests
+            edge_case_tests()
+
+        print("\n" + "=" * 70)
+        print("ANALYSIS COMPLETE")
+        print("=" * 70)
+        print()
 
 
 # Entry point when run as script
@@ -578,6 +821,15 @@ if __name__ == "__main__":
         improvements, baseline = redundancy_trade_study(failure_probs, n_samples=100000)
         plot_redundancy_trade_study(failure_probs, improvements, baseline)
         
+        # Variance analysis
+        print("\nRunning variance analysis...")
+        results, analytical, theoretical_std = monte_carlo_variance_analysis(
+            failure_probs, n_samples=10000, n_runs=50)
+        plot_variance_analysis(results, analytical, theoretical_std, 10000)
+
+        # Edge case tests
+        edge_case_tests()
+
         print("\n" + "=" * 70)
         print("ALL TESTS COMPLETE")
         print("=" * 70)
