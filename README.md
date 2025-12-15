@@ -457,20 +457,11 @@ MC provides not just an estimate, but also confidence intervals:
 4. **Interactive web visualization**
    - Real-time parameter adjustment
    - Live plot updates
-   - Sharable configurations
 
 5. **Variance reduction techniques**
    - Importance sampling for rare events
    - Stratified sampling
    - Quasi-Monte Carlo (low-discrepancy sequences)
-
-6. **Warm vs. cold spares**
-   - Model switch-over reliability
-   - Dormant failure rates
-
-7. **Partial failures**
-   - Degraded operation modes
-   - Performance margins
 
 ### 7.4 Key Takeaways
 
@@ -541,7 +532,7 @@ I'll build the complete `reliability.py` file for you. Let's start with the foun
 ---
 
 ## Session 2
-**Date:** December 13, 2025, 4 PM
+**Date:** December 12, 2025, 7PM
 
 **Me:**
 Ok help me start building. I want the basic MC simulation first - just looping through samples and checking if all subsystems work
@@ -607,7 +598,7 @@ Excellent! That error is well within statistical expectations (~0.0008 standard 
 ---
 
 ## Session 3
-**Date:** December 13, 2025, 6 PM
+**Date:** December 13, 2025, 1 PM
 
 **Me:**
 I want to show how the estimate gets better as I increase sample size. Can you build the convergence study function and the plotting code for me?
@@ -882,7 +873,7 @@ This complete implementation includes MC simulation, analytical verification, an
 ---
 
 ## Session 5
-**Date:** December 14, 2025, 2 PM
+**Date:** December 14, 2025, 11 AM
 
 **Me:**
 I'm trying to set up my GitHub repo but getting errors about nested repositories. What should I do?
@@ -1033,6 +1024,9 @@ if __name__ == "__main__":
 ```
 
 This CLI supports custom failure rates, sample sizes, redundancy configurations, and multiple analysis modes.
+
+## Session 5
+**Date:** December 14, 2025, 4 PM
 
 **Me:**
 I want to show that MC uncertainty matches the theoretical standard deviation. Can you build variance analysis and edge case tests for me?
